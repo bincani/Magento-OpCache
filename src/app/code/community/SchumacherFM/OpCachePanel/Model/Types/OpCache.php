@@ -13,6 +13,8 @@ class SchumacherFM_OpCachePanel_Model_Types_OpCache extends SchumacherFM_OpCache
      * @var array
      */
     protected $_compiledFiles = NULL;
+    protected $_blackList = null;
+    protected $_blackListPattern = null;
 
     /**
      * @return bool
@@ -55,9 +57,44 @@ class SchumacherFM_OpCachePanel_Model_Types_OpCache extends SchumacherFM_OpCache
         if (NULL !== $this->_compiledFiles) {
             return $this->_compiledFiles;
         }
-        $status               = opcache_get_status();
+        $status = opcache_get_status();
         $this->_compiledFiles = $status['scripts'];
         return $this->_compiledFiles;
+    }
+
+
+    /**
+     * @return array
+     */
+    protected function _getBlackList()
+    {
+        if (NULL !== $this->_blackList) {
+            return $this->_blackList;
+        }
+        if (Mage::helper('opcache')->isCommandLineInterface()) {
+            $this->_blackList = Mage::helper('opcache')->getBlackList();
+        }
+        else {
+            $config = opcache_get_configuration();
+            $this->_blackList = array_values($config['blacklist']);
+        }
+        return $this->_blackList;
+    }
+
+    /**
+     * @return string
+     */
+    protected function _getBlackListPattern()
+    {
+        $blackList = $this->_getBlackList();
+        $retVal = $blackList;
+        if (is_array($blackList)) {
+            $blackList = array_map(function($value) {
+                return preg_quote($value, '/');
+            }, $blackList);
+            $retVal = sprintf("/^(%s)/", implode('|', $blackList));
+        }
+        return $retVal;
     }
 
     /**
@@ -67,12 +104,24 @@ class SchumacherFM_OpCachePanel_Model_Types_OpCache extends SchumacherFM_OpCache
      */
     public function compile($pathToFile)
     {
-
         $files = $this->_getCompiledFiles();
-        if (isset($files[$pathToFile])) { // work around to avoid a segmentation fault in php binary :-(
+        $blackListPattern = $this->_getBlackListPattern();
+        if (
+            // work around to avoid a segmentation fault in php binary
+            isset($files[$pathToFile])
+            ||
+            // skip files in opCache blackList
+            preg_match($blackListPattern, $pathToFile)
+        ) {
+            /*
+            // debug pattern
+            if (preg_match($blackListPattern, $pathToFile)) {
+                Mage::log(sprintf("%s->blackListPattern '%s'!", __METHOD__, $blackListPattern));
+                Mage::log(sprintf("%s->skip '%s'[%d]!", __METHOD__, $pathToFile, preg_match($blackListPattern, $pathToFile)));
+            }
+            */
             return TRUE;
         }
-
         return @opcache_compile_file($pathToFile);
     }
 

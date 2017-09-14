@@ -54,4 +54,35 @@ class SchumacherFM_OpCachePanel_Helper_Data extends Mage_Core_Helper_Abstract
         $key = $this->getApiKey();
         return !empty($key) && $key === $postApiKey;
     }
+
+
+    public function isCommandLineInterface() {
+        return (php_sapi_name() === 'cli');
+    }
+
+    public function getBlacklist() {
+        $blacklist = array();
+        $config = Mage::getSingleton('opcache/cache')->getConfiguration();
+        foreach (glob($config['directives']['opcache.blacklist_filename']) as $filename) {
+            $handle = fopen($filename, "r");
+            if ($handle) {
+                while (($line = fgets($handle)) !== false) {
+                    // Line starting with a ; are ignored (comments).
+                    $line = trim($line);
+                    if (strlen($line) && !preg_match("/^\s*;/i", $line)) {
+                        // check if it ends in an astericks
+                        if (preg_match("/\*$/", $line)) {
+                            $blacklist[] =substr( $line, 0, -1);
+                        }
+                        else {
+                            $blacklist[] = $line;
+                        }
+                    }
+                }
+                fclose($handle);
+            }
+        }
+        return $blacklist;
+    }
+
 }

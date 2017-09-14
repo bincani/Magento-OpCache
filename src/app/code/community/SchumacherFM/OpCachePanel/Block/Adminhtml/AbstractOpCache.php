@@ -83,7 +83,7 @@ abstract class SchumacherFM_OpCachePanel_Block_Adminhtml_AbstractOpCache extends
                 foreach ($value as $column) {
                     $return[] = '<td class="v">' . $column . '</td>';
                 }
-                echo '</tr>';
+                $return[] = '</tr>';
             } else {
                 $return[] = '<td class="v">' . $value . '</td></tr>';
             }
